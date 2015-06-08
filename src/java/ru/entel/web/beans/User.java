@@ -5,27 +5,25 @@
  */
 package ru.entel.web.beans;
 
+import java.io.Serializable;
 import javax.faces.bean.ManagedBean;
 import javax.faces.bean.SessionScoped;
 
-/**
- *
- * @author Farades
- */
 @ManagedBean
 @SessionScoped
-public class User {
-    private String userName;
+public class User implements Serializable{
+
+    private String username;
     
     public User() {
     }
 
-    public String getUserName() {
-        return userName;
+    public String getUsername() {
+        return username;
     }
 
-    public void setUserName(String userName) {
-        this.userName = userName;
+    public void setUsername(String username) {
+        this.username = username;
     }
-    
 }
+
