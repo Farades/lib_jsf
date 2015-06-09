@@ -1,10 +1,6 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
 package ru.entel.web.controllers;
 
+import java.io.Serializable;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -22,16 +18,22 @@ import ru.entel.web.beans.Book;
 import ru.entel.web.db.Database;
 import ru.entel.web.enums.SearchType;
 
-/**
- *
- * @author Farades
- */
 @ManagedBean(eager = true)
 @SessionScoped
-public class SearchController {
+public class SearchController implements Serializable {
+
+    private boolean requestFromPager;
+    private int booksOnPage = 2;
+    private int selectedGenreId; // выбранный жанр
+    private char selectedLetter; // выбранная буква алфавита
+    private long selectedPageNumber = 1; // выбранный номер страницы в постраничной навигации
+    private long totalBooksCount; // общее кол-во книг (не на текущей странице, а всего), нажно для постраничности
+    private ArrayList<Integer> pageNumbers = new ArrayList<Integer>(); // общее кол-во книг (не на текущей странице, а всего), нажно для постраничности
     private SearchType searchType;// хранит выбранный тип поиска
-    private static Map<String, SearchType> searchList = new HashMap<String, SearchType>(); // хранит все виды поисков (по автору, по названию)
+    private String searchString; // хранит поисковую строку
+    private Map<String, SearchType> searchList = new HashMap<String, SearchType>(); // хранит все виды поисков (по автору, по названию)
     private ArrayList<Book> currentBookList; // текущий список книг для отображения
+    private String currentSql;// последний выполнный sql без добавления limit
 
     public SearchController() {
         fillBooksAll();
@@ -39,9 +41,14 @@ public class SearchController {
         ResourceBundle bundle = ResourceBundle.getBundle("ru.entel.web.nls.messages", FacesContext.getCurrentInstance().getViewRoot().getLocale());
         searchList.put(bundle.getString("author_name"), SearchType.AUTHOR);
         searchList.put(bundle.getString("book_name"), SearchType.TITLE);
+
     }
-    
+
     private void fillBooksBySQL(String sql) {
+
+        StringBuilder sqlBuilder = new StringBuilder(sql);
+
+        currentSql = sql;
 
         Statement stmt = null;
         ResultSet rs = null;
@@ -51,7 +58,24 @@ public class SearchController {
             conn = Database.getConnection();
             stmt = conn.createStatement();
 
-            rs = stmt.executeQuery(sql);
+            System.out.println(requestFromPager);
+            if (!requestFromPager) {
+
+                rs = stmt.executeQuery(sqlBuilder.toString());
+                rs.last();
+
+                totalBooksCount = rs.getRow();
+                fillPageNumbers(totalBooksCount, booksOnPage);
+
+            }
+
+
+
+            if (totalBooksCount > booksOnPage) {
+                sqlBuilder.append(" limit ").append(selectedPageNumber * booksOnPage - booksOnPage).append(",").append(booksOnPage);
+            }
+
+            rs = stmt.executeQuery(sqlBuilder.toString());
 
             currentBookList = new ArrayList<Book>();
 
@@ -65,7 +89,8 @@ public class SearchController {
                 book.setPageCount(rs.getInt("page_count"));
                 book.setPublishDate(rs.getInt("publish_year"));
                 book.setPublisher(rs.getString("publisher"));
-//                book.setImage(rs.getBytes("image"));
+//              book.setImage(rs.getBytes("image"));
+//              book.setContent(rs.getBytes("content"));
                 book.setDescr(rs.getString("descr"));
                 currentBookList.add(book);
             }
@@ -95,19 +120,124 @@ public class SearchController {
                 + "a.fio as author, g.name as genre, b.image from book b inner join author a on b.author_id=a.id "
                 + "inner join genre g on b.genre_id=g.id inner join publisher p on b.publisher_id=p.id order by b.name");
     }
-    
-    public void fillBooksByGenre() {
+
+    private void submitValues(Character selectedLetter, long selectedPageNumber, int selectedGenreId, boolean requestFromPager) {
+        this.selectedLetter = selectedLetter;
+        this.selectedPageNumber = selectedPageNumber;
+        this.selectedGenreId = selectedGenreId;
+        this.requestFromPager = requestFromPager;
+
+    }
+
+    public String fillBooksByGenre() {
 
         Map<String, String> params = FacesContext.getCurrentInstance().getExternalContext().getRequestParameterMap();
-        Integer genre_id = Integer.valueOf(params.get("genre_id"));
+
+        submitValues(' ', 1, Integer.valueOf(params.get("genre_id")), false);
 
         fillBooksBySQL("select b.id,b.name,b.isbn,b.page_count,b.publish_year, p.name as publisher, a.fio as author, g.name as genre, b.descr, b.image from book b "
                 + "inner join author a on b.author_id=a.id "
                 + "inner join genre g on b.genre_id=g.id "
                 + "inner join publisher p on b.publisher_id=p.id "
-                + "where genre_id=" + genre_id + " order by b.name ");
+                + "where genre_id=" + selectedGenreId + " order by b.name ");
+
+
+
+        return "books";
     }
-    
+
+    public String fillBooksByLetter() {
+
+        Map<String, String> params = FacesContext.getCurrentInstance().getExternalContext().getRequestParameterMap();
+        selectedLetter = params.get("letter").charAt(0);
+
+        submitValues(selectedLetter, 1, -1, false);
+
+
+        fillBooksBySQL("select b.id,b.name,b.isbn,b.page_count,b.publish_year, p.name as publisher, a.fio as author, g.name as genre, b.descr, b.image from book b "
+                + "inner join author a on b.author_id=a.id "
+                + "inner join genre g on b.genre_id=g.id "
+                + "inner join publisher p on b.publisher_id=p.id "
+                + "where substr(b.name,1,1)='" + selectedLetter + "' order by b.name ");
+
+        return "books";
+    }
+
+    public String fillBooksBySearch() {
+
+        submitValues(' ', 1, -1, false);
+
+        if (searchString.trim().length() == 0) {
+            fillBooksAll();
+            return "books";
+        }
+
+        StringBuilder sql = new StringBuilder("select b.descr, b.id,b.name,b.isbn,b.page_count,b.publish_year, p.name as publisher, a.fio as author, g.name as genre, b.image from book b "
+                + "inner join author a on b.author_id=a.id "
+                + "inner join genre g on b.genre_id=g.id "
+                + "inner join publisher p on b.publisher_id=p.id ");
+
+        if (searchType == SearchType.AUTHOR) {
+            sql.append("where lower(a.fio) like '%" + searchString.toLowerCase() + "%' order by b.name ");
+
+        } else if (searchType == SearchType.TITLE) {
+            sql.append("where lower(b.name) like '%" + searchString.toLowerCase() + "%' order by b.name ");
+        }
+
+
+
+        fillBooksBySQL(sql.toString());
+
+
+        return "books";
+    }
+
+    public void selectPage() {
+        Map<String, String> params = FacesContext.getCurrentInstance().getExternalContext().getRequestParameterMap();
+        selectedPageNumber = Integer.valueOf(params.get("page_number"));
+        requestFromPager = true;
+        fillBooksBySQL(currentSql);
+    }
+
+    public byte[] getContent(int id) {
+        Statement stmt = null;
+        ResultSet rs = null;
+        Connection conn = null;
+
+
+        byte[] content = null;
+        try {
+            conn = Database.getConnection();
+            stmt = conn.createStatement();
+
+            rs = stmt.executeQuery("select content from book where id=" + id);
+            while (rs.next()) {
+                content = rs.getBytes("content");
+            }
+        } catch (SQLException ex) {
+            Logger.getLogger(Book.class
+                    .getName()).log(Level.SEVERE, null, ex);
+        } finally {
+            try {
+                if (stmt != null) {
+                    stmt.close();
+                }
+                if (rs != null) {
+                    rs.close();
+                }
+                if (conn != null) {
+                    conn.close();
+                }
+            } catch (SQLException ex) {
+                Logger.getLogger(Book.class
+                        .getName()).log(Level.SEVERE, null, ex);
+            }
+        }
+
+        return content;
+
+    }
+
     public byte[] getImage(int id) {
         Statement stmt = null;
         ResultSet rs = null;
@@ -146,7 +276,7 @@ public class SearchController {
 
         return image;
     }
-    
+
     public Character[] getRussianLetters() {
         Character[] letters = new Character[33];
         letters[0] = 'А';
@@ -185,7 +315,34 @@ public class SearchController {
 
         return letters;
     }
-    
+
+    private void fillPageNumbers(long totalBooksCount, int booksCountOnPage) {
+
+        int pageCount = booksCountOnPage > 0 ? (int) ((totalBooksCount / booksCountOnPage) + 1) : 0;
+
+        pageNumbers.clear();
+        for (int i = 1; i <= pageCount; i++) {
+            pageNumbers.add(i);
+        }
+
+    }
+
+    public ArrayList<Integer> getPageNumbers() {
+        return pageNumbers;
+    }
+
+    public void setPageNumbers(ArrayList<Integer> pageNumbers) {
+        this.pageNumbers = pageNumbers;
+    }
+
+    public String getSearchString() {
+        return searchString;
+    }
+
+    public void setSearchString(String searchString) {
+        this.searchString = searchString;
+    }
+
     public SearchType getSearchType() {
         return searchType;
     }
@@ -200,5 +357,45 @@ public class SearchController {
 
     public ArrayList<Book> getCurrentBookList() {
         return currentBookList;
+    }
+
+    public void setTotalBooksCount(long booksCount) {
+        this.totalBooksCount = booksCount;
+    }
+
+    public long getTotalBooksCount() {
+        return totalBooksCount;
+    }
+
+    public int getSelectedGenreId() {
+        return selectedGenreId;
+    }
+
+    public void setSelectedGenreId(int selectedGenreId) {
+        this.selectedGenreId = selectedGenreId;
+    }
+
+    public char getSelectedLetter() {
+        return selectedLetter;
+    }
+
+    public void setSelectedLetter(char selectedLetter) {
+        this.selectedLetter = selectedLetter;
+    }
+
+    public int getBooksOnPage() {
+        return booksOnPage;
+    }
+
+    public void setBooksOnPage(int booksOnPage) {
+        this.booksOnPage = booksOnPage;
+    }
+
+    public void setSelectedPageNumber(long selectedPageNumber) {
+        this.selectedPageNumber = selectedPageNumber;
+    }
+
+    public long getSelectedPageNumber() {
+        return selectedPageNumber;
     }
 }
