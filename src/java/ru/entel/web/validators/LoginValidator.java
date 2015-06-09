@@ -19,17 +19,18 @@ public class LoginValidator implements Validator {
 
     @Override
     public void validate(FacesContext context, UIComponent component, Object value) throws ValidatorException {
+
         ResourceBundle bundle = ResourceBundle.getBundle("ru.entel.web.nls.messages", FacesContext.getCurrentInstance().getViewRoot().getLocale());
-        
+
         try {
             String newValue = value.toString();
 
+            if (newValue.length() > 0 && !Character.isLetter(newValue.charAt(0))) {
+                throw new IllegalArgumentException(bundle.getString("first_letter_error"));
+            }
+            
             if (newValue.length() < 5) {
                 throw new IllegalArgumentException(bundle.getString("login_length_error"));
-            }
-
-            if (!Character.isLetter(newValue.charAt(0))) {
-                throw new IllegalArgumentException(bundle.getString("first_letter_error"));
             }
 
             if (getTestArray().contains(newValue)) {
@@ -42,8 +43,9 @@ public class LoginValidator implements Validator {
             message.setSeverity(FacesMessage.SEVERITY_ERROR);
             throw new ValidatorException(message);
         }
+
     }
-    
+
     private ArrayList<String> getTestArray() {
         ArrayList<String> list = new ArrayList<String>();// заглушка, желательно делать запрос в базу данных для проверки существующего имени
         list.add("username");

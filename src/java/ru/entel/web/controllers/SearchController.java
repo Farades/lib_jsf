@@ -58,7 +58,6 @@ public class SearchController implements Serializable {
             conn = Database.getConnection();
             stmt = conn.createStatement();
 
-            System.out.println(requestFromPager);
             if (!requestFromPager) {
 
                 rs = stmt.executeQuery(sqlBuilder.toString());
@@ -131,9 +130,13 @@ public class SearchController implements Serializable {
 
     public String fillBooksByGenre() {
 
+        imitateLoading();
+
         Map<String, String> params = FacesContext.getCurrentInstance().getExternalContext().getRequestParameterMap();
 
-        submitValues(' ', 1, Integer.valueOf(params.get("genre_id")), false);
+        selectedGenreId = Integer.valueOf(params.get("genre_id"));
+
+        submitValues(' ', 1, selectedGenreId, false);
 
         fillBooksBySQL("select b.id,b.name,b.isbn,b.page_count,b.publish_year, p.name as publisher, a.fio as author, g.name as genre, b.descr, b.image from book b "
                 + "inner join author a on b.author_id=a.id "
@@ -147,6 +150,8 @@ public class SearchController implements Serializable {
     }
 
     public String fillBooksByLetter() {
+        
+        imitateLoading();
 
         Map<String, String> params = FacesContext.getCurrentInstance().getExternalContext().getRequestParameterMap();
         selectedLetter = params.get("letter").charAt(0);
@@ -164,6 +169,8 @@ public class SearchController implements Serializable {
     }
 
     public String fillBooksBySearch() {
+        
+        imitateLoading();
 
         submitValues(' ', 1, -1, false);
 
@@ -193,6 +200,7 @@ public class SearchController implements Serializable {
     }
 
     public void selectPage() {
+        imitateLoading();
         Map<String, String> params = FacesContext.getCurrentInstance().getExternalContext().getRequestParameterMap();
         selectedPageNumber = Integer.valueOf(params.get("page_number"));
         requestFromPager = true;
@@ -397,5 +405,13 @@ public class SearchController implements Serializable {
 
     public long getSelectedPageNumber() {
         return selectedPageNumber;
+    }
+
+    private void imitateLoading() {
+        try {
+            Thread.sleep(1000);// имитация загрузки процесса
+        } catch (InterruptedException ex) {
+            Logger.getLogger(SearchController.class.getName()).log(Level.SEVERE, null, ex);
+        }
     }
 }

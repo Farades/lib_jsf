@@ -2,13 +2,18 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml"
       xmlns:h="http://java.sun.com/jsf/html"
-    xmlns:ui="http://java.sun.com/jsf/facelets">
+      xmlns:ui="http://java.sun.com/jsf/facelets">
     
     <h:head>
         <title><ui:insert name="title" /></title>
         <h:outputStylesheet library="css" name="style_main.css" />
+        <h:outputScript library="js" name="library.js" target="head" />
     </h:head>
     <h:body>
+        <div id="loading_wrapper">
+            <p>#{msg.loading}...</p>
+        </div>
+        
         <div class="container">
             <div class="header">
                 <ui:insert name="header">
@@ -27,18 +32,20 @@
                     <p><strong><ui:insert name="books_count"/></strong></p>
 
                     <div class="pager">
-                        <ui:insert name="paginator"/>
+                        <h:panelGroup id="pages1" layout="block">
+                            <ui:insert name="paginator"/>
+                        </h:panelGroup>
                     </div>
 
                     <div class="content_books">
                         <ui:insert name="content">
-                            <ui:include src="/templates/content.xhtml"/>
                         </ui:insert>    
                     </div>
                     
                     <div class="pager">
-                        <ui:insert name="paginator"/>
-
+                        <h:panelGroup id="pages2" layout="block">
+                            <ui:insert name="paginator"/>
+                        </h:panelGroup>
                     </div>
 
                 </div>
