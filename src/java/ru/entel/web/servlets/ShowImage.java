@@ -11,7 +11,7 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import ru.entel.web.controllers.SearchController;
+import ru.entel.web.controllers.BookListController;
 
 /**
  *
@@ -36,7 +36,7 @@ public class ShowImage extends HttpServlet {
         try {
             int id = Integer.valueOf(request.getParameter("id"));
             
-            SearchController searchController = (SearchController)request.getSession(false).getAttribute("searchController");
+            BookListController searchController = (BookListController)request.getSession(false).getAttribute("bookListController");
             
             byte[] image = searchController.getImage(id);         
             response.setContentLength(image.length);
